@@ -29,18 +29,6 @@ class GPTModel(nn.Module):
         logits = self.out_head(x)
         return logits
 
-def generate_text_simple(model, batch, max_new_tokens, context_size):
-    for _ in range(max_new_tokens):
-        cropped_batch = batch[:, -context_size:]
-        with torch.no_grad():
-            logits = model(cropped_batch)
-        logits = logits[:, -1, :]
-        probas = torch.softmax(logits, dim=-1)
-        batch_next = torch.argmax(probas, dim=-1, keepdim=True)
-        batch = torch.cat((batch, batch_next), dim=1)
-    
-    return batch 
-
 class TransformerBlock(nn.Module):
     def __init__(self, cfg):
         super().__init__()
