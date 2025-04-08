@@ -66,7 +66,6 @@ def get_small_gpt_2_model():
         print(f"Downloaded to {SMALL_GPT_2_CACHE_PATH}")
     
     torch.manual_seed(123) 
-    GPT_SMALL.update(model_configs[DEFAULT])
     model = GPTModel(GPT_SMALL)
     model.load_state_dict(torch.load(SMALL_GPT_2_CACHE_PATH, weights_only=True))
     model.eval()
