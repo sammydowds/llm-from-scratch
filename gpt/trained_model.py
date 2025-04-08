@@ -1,15 +1,19 @@
-from configs import GPT_CONFIG_124M 
-from loaders import create_dataloader_v1
+from configs import GPT_SMALL, DEFAULT, model_configs 
+from loaders import get_verdict_data_loaders 
 from gpt import GPTModel
 from train import train_model_simple
 import tiktoken
 import torch
+import os
+import urllib.request
 
 SIMPLY_TRAINED_MODEL_CACHE_PATH = "simply-trained-model.pth"
+SMALL_GPT_2_CACHE_PATH = "gpt2-small-124M.pth"
+SMALL_GPT_2_REMOTE_PATH = f"https://huggingface.co/rasbt/gpt2-from-scratch-pytorch/resolve/main/{SMALL_GPT_2_CACHE_PATH}"
 
 def get_simply_trained_model(file_path = "the-verdict.txt", skip_cache = False):
     torch.manual_seed(123)
-    model = GPTModel(GPT_CONFIG_124M)
+    model = GPTModel(GPT_SMALL)
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=0.0004,
@@ -30,36 +34,12 @@ def get_simply_trained_model(file_path = "the-verdict.txt", skip_cache = False):
             print("Found cached model, skipping training.")
             model.load_state_dict(cached['model_state_dict'])
             optimizer.load_state_dict(cached['optimizer_state_dict'])
+            model.eval()
             return model, { "meta": {}, "tokenizer": tokenizer, "optimizer": optimizer }
     else:
         print("Skipping cache read. Initializing training...")
 
-    with open(file_path, "r", encoding='utf-8') as file:
-        text_data = file.read()
-    train_ratio = 0.9
-    split_idx = int(train_ratio * len(text_data))
-    train_data = text_data[:split_idx]
-    val_data = text_data[split_idx:]
-
-    train_loader = create_dataloader_v1(
-        train_data,
-        batch_size=2,
-        max_length=GPT_CONFIG_124M["context_length"],
-        stride=GPT_CONFIG_124M["context_length"],
-        drop_last=True,
-        shuffle=True,
-        num_workers=0,
-    )
-    val_loader = create_dataloader_v1(
-        val_data,
-        batch_size=2,
-        max_length=GPT_CONFIG_124M["context_length"],
-        stride=GPT_CONFIG_124M["context_length"],
-        drop_last=False,
-        shuffle=False,
-        num_workers=0,
-    )
-    
+    train_loader, val_loader = get_verdict_data_loaders()
     train_losses, val_losses, tokens_seen = train_model_simple(
         model=model,
         train_loader=train_loader,
@@ -79,3 +59,16 @@ def get_simply_trained_model(file_path = "the-verdict.txt", skip_cache = False):
         torch.save({ "model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict()}, SIMPLY_TRAINED_MODEL_CACHE_PATH)
 
     return model, { "tokenizer": tokenizer, "optimizer": optimizer, "meta": { "train_losses": train_losses, "val_losses": val_losses, "tokens_seen": tokens_seen }}  
+
+def get_small_gpt_2_model():
+    if not os.path.exists(SMALL_GPT_2_CACHE_PATH):
+        urllib.request.urlretrieve(SMALL_GPT_2_REMOTE_PATH, SMALL_GPT_2_CACHE_PATH)
+        print(f"Downloaded to {SMALL_GPT_2_CACHE_PATH}")
+    
+    torch.manual_seed(123) 
+    GPT_SMALL.update(model_configs[DEFAULT])
+    model = GPTModel(GPT_SMALL)
+    model.load_state_dict(torch.load(SMALL_GPT_2_CACHE_PATH, weights_only=True))
+    model.eval()
+
+    return model

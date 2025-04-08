@@ -1,17 +1,17 @@
 import torch
 from generate import generate, text_to_token_ids, token_ids_to_text
-from configs import GPT_CONFIG_124M
+from configs import GPT_SMALL
 from trained_model import get_simply_trained_model
 
 # train  
-model, meta = get_simply_trained_model()
+model, meta = get_simply_trained_model(skip_cache=True)
 
 # testing temps and top-k
 token_ids = generate(
     model=model,
     idx=text_to_token_ids("Ever effort moves you", tokenizer=meta["tokenizer"]),
     max_new_tokens=15,
-    context_size=GPT_CONFIG_124M["context_length"],
+    context_size=GPT_SMALL["context_length"],
     top_k=10,
     temperature=1
 )

@@ -23,7 +23,7 @@ class GPTDatasetV1(Dataset):
 def create_dataloader_v1(txt, batch_size=4, max_length=256, stride=128, shuffle=True, drop_last=True, num_workers=0, tokenizer = tiktoken.get_encoding('gpt2')):
     dataset = GPTDatasetV1(txt, tokenizer, max_length, stride)
     dataloader = DataLoader(
-        dataset,
+        dataset=dataset,
         batch_size=batch_size,
         shuffle=shuffle,
         drop_last=drop_last,
@@ -31,3 +31,32 @@ def create_dataloader_v1(txt, batch_size=4, max_length=256, stride=128, shuffle=
     )
 
     return dataloader
+
+def get_verdict_data_loaders():
+    with open("the-verdict.txt", "r", encoding='utf-8') as file:
+        text_data = file.read()
+    train_ratio = 0.9
+    split_idx = int(train_ratio * len(text_data))
+    train_data = text_data[:split_idx]
+    val_data = text_data[split_idx:]
+
+    train_loader = create_dataloader_v1(
+        txt=train_data,
+        batch_size=2,
+        max_length=256,
+        stride=256,
+        drop_last=True,
+        shuffle=True,
+        num_workers=0,
+    )
+    val_loader = create_dataloader_v1(
+        txt=val_data,
+        batch_size=2,
+        max_length=256,
+        stride=256,
+        drop_last=False,
+        shuffle=False,
+        num_workers=0,
+    )
+
+    return train_loader, val_loader
