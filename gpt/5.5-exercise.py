@@ -7,7 +7,6 @@ from train import calc_loss_loader
 # get GPT-2 small 
 model = get_small_gpt_2_model()
 tokenizer = tiktoken.get_encoding('gpt2')
-model.eval()
 
 train_loader, val_loader = get_verdict_data_loaders()
 print("GPT-2-SMALL: Train loss:\n", calc_loss_loader(train_loader, model, torch.device("cpu")))

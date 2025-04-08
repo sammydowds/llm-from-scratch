@@ -11,7 +11,7 @@ SIMPLY_TRAINED_MODEL_CACHE_PATH = "simply-trained-model.pth"
 SMALL_GPT_2_CACHE_PATH = "gpt2-small-124M.pth"
 SMALL_GPT_2_REMOTE_PATH = f"https://huggingface.co/rasbt/gpt2-from-scratch-pytorch/resolve/main/{SMALL_GPT_2_CACHE_PATH}"
 
-def get_simply_trained_model(file_path = "the-verdict.txt", skip_cache = False):
+def get_simply_trained_model(skip_cache = False):
     torch.manual_seed(123)
     model = GPTModel(GPT_SMALL)
     optimizer = torch.optim.AdamW(
@@ -66,8 +66,11 @@ def get_small_gpt_2_model():
         print(f"Downloaded to {SMALL_GPT_2_CACHE_PATH}")
     
     torch.manual_seed(123) 
-    model = GPTModel(GPT_SMALL)
+    NEW_CONFIG = GPT_SMALL.copy()
+    NEW_CONFIG.update({ "qkv_bias": True, "context_length": 1024 })
+    model = GPTModel(NEW_CONFIG)
     model.load_state_dict(torch.load(SMALL_GPT_2_CACHE_PATH, weights_only=True))
+    model.to(torch.device("cpu"))
     model.eval()
 
     return model
