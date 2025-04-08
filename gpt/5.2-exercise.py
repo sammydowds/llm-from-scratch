@@ -4,7 +4,6 @@ from configs import GPT_CONFIG_124M
 from trained_model import get_simply_trained_model
 
 # train  
-torch.manual_seed(123)
 model, meta = get_simply_trained_model()
 
 # testing temps and top-k

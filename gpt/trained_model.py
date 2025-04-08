@@ -8,20 +8,29 @@ import torch
 SIMPLY_TRAINED_MODEL_CACHE_PATH = "simply-trained-model.pth"
 
 def get_simply_trained_model(file_path = "the-verdict.txt", skip_cache = False):
+    torch.manual_seed(123)
     model = GPTModel(GPT_CONFIG_124M)
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=0.0004,
+        weight_decay=0.1
+    )
     tokenizer = tiktoken.get_encoding('gpt2')
+    device = torch.device("cpu")
+    num_epochs = 10
 
-    # check if cached 
+    # check cache 
     if not skip_cache:
-        existing = None
+        cached = None
         try: 
-            existing = torch.load(SIMPLY_TRAINED_MODEL_CACHE_PATH)
+            cached = torch.load(SIMPLY_TRAINED_MODEL_CACHE_PATH)
         except:
             print("Unabled to find cached model.")
-        if existing:
+        if cached:
             print("Found cached model, skipping training.")
-            model.load_state_dict(existing)
-            return model, { "meta": {}, "tokenizer": tokenizer}
+            model.load_state_dict(cached['model_state_dict'])
+            optimizer.load_state_dict(cached['optimizer_state_dict'])
+            return model, { "meta": {}, "tokenizer": tokenizer, "optimizer": optimizer }
     else:
         print("Skipping cache read. Initializing training...")
 
@@ -32,7 +41,6 @@ def get_simply_trained_model(file_path = "the-verdict.txt", skip_cache = False):
     train_data = text_data[:split_idx]
     val_data = text_data[split_idx:]
 
-    torch.manual_seed(123)
     train_loader = create_dataloader_v1(
         train_data,
         batch_size=2,
@@ -51,15 +59,7 @@ def get_simply_trained_model(file_path = "the-verdict.txt", skip_cache = False):
         shuffle=False,
         num_workers=0,
     )
-
-    device = torch.device("cpu")
-    optimizer = torch.optim.AdamW(
-        model.parameters(),
-        lr=0.0004,
-        weight_decay=0.1
-    )
-    num_epochs = 10
-
+    
     train_losses, val_losses, tokens_seen = train_model_simple(
         model=model,
         train_loader=train_loader,
@@ -73,9 +73,9 @@ def get_simply_trained_model(file_path = "the-verdict.txt", skip_cache = False):
         tokenizer=tokenizer
     )
 
-    # cache model
+    # cache model, optimizer
     if not skip_cache:
         print("Training complete. Caching model.")
-        torch.save(model.state_dict(), SIMPLY_TRAINED_MODEL_CACHE_PATH)
+        torch.save({ "model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict()}, SIMPLY_TRAINED_MODEL_CACHE_PATH)
 
-    return model, { "meta": { "train_losses": train_losses, "val_losses": val_losses, "tokens_seen": tokens_seen, }, "tokenizer": tokenizer }  
+    return model, { "tokenizer": tokenizer, "optimizer": optimizer, "meta": { "train_losses": train_losses, "val_losses": val_losses, "tokens_seen": tokens_seen }}  
