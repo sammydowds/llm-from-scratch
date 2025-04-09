@@ -26,6 +26,7 @@ class GPTModel(nn.Module):
         x = tok_embeds + pos_embeds
         x = self.drop_emb(x)
         x = self.trf_blocks(x)
+        x = self.final_norm(x)
         logits = self.out_head(x)
         return logits
 
@@ -54,7 +55,7 @@ class TransformerBlock(nn.Module):
 
         shortcut = x
         x = self.norm2(x)
-        x = self.att(x)
+        x = self.ff(x)
         x = self.drop_shortcut(x)
         x = x + shortcut
         return x
@@ -139,7 +140,7 @@ class MultiHeadAttention(nn.Module):
         context_vec = (attn_weights @ values).transpose(1, 2)
 
         # combine heads
-        context_vec = context_vec.contiguous().view(
+        context_vec = context_vec.reshape(
             b, num_tokens, self.d_out
         )
         context_vec = self.out_proj(context_vec)
