@@ -65,12 +65,9 @@ def get_small_gpt_2_model():
         urllib.request.urlretrieve(SMALL_GPT_2_REMOTE_PATH, SMALL_GPT_2_CACHE_PATH)
         print(f"Downloaded to {SMALL_GPT_2_CACHE_PATH}")
     
-    torch.manual_seed(123) 
-    NEW_CONFIG = GPT_SMALL.copy()
-    NEW_CONFIG.update({ "qkv_bias": True, "context_length": 1024 })
-    model = GPTModel(NEW_CONFIG)
+    model = GPTModel(GPT_SMALL)
     model.load_state_dict(torch.load(SMALL_GPT_2_CACHE_PATH, weights_only=True))
-    model.to(torch.device("cpu"))
     model.eval()
+    model.to(torch.device("cpu"))
 
     return model
