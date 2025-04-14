@@ -1,4 +1,9 @@
+# data files
 *.txt
+*.csv
+*.zip
+sms_spam_collection
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
