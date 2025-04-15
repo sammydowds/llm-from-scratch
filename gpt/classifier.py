@@ -7,6 +7,8 @@ import time
 from fine_tuning.classification.dataset import SpamDataset
 from fine_tuning.classification.fetcher import SMSSpamFetcher
 
+TRAINED_MODEL_CACHE = 'spam-classifier.pth'
+
 def calc_loss_batch(input_batch, target_batch, model, device):
     input_batch = input_batch.to(device)
     target_batch = target_batch.to(device)
@@ -106,28 +108,39 @@ def train_classifier_simple(
         val_accs.append(val_accuracy)
     return train_losses, val_losses, train_accs, val_accs, examples_seen
 
-def train_spam_classifier():
-    # get data
-    fetcher = SMSSpamFetcher()
-    fetcher.fetch_and_process()
-
-    # init model
+def get_trained_spam_classifier(skip_cache = False):
+    # init model 
     gpt = get_small_gpt_2_model()
-    
-    # tweak output layer 
     torch.manual_seed(123)
+    
+    # tweak for classification
     num_classes = 2
     gpt.out_head = torch.nn.Linear(
         in_features=GPT_SMALL["emb_dim"],
         out_features=num_classes,
     )
-
-    # tweak layer params
     for param in gpt.trf_blocks[-1].parameters():
         param.requires_grad = True
     for param in gpt.final_norm.parameters():
         param.requires_grad = True
 
+    # check for trained cache
+    cached = None
+    if not skip_cache:
+        try: 
+            cached = torch.load(TRAINED_MODEL_CACHE)
+        except:
+            print("Unabled to find cached fine-tuned classifier model.")
+        if cached:
+            print("Found cached model, skipping classification fine tuning.")
+            gpt.load_state_dict(cached)
+            gpt.eval()
+            return gpt
+    
+    # no cache, train 
+    fetcher = SMSSpamFetcher()
+    fetcher.fetch_and_process()
+   
     tokenizer = tiktoken.get_encoding('gpt2')
     start_time = time.time()
     torch.manual_seed(123)
@@ -169,6 +182,11 @@ def train_spam_classifier():
     end_time = time.time()
     execution_time_minutes = (end_time - start_time) / 60
     print(f"Training completed: {execution_time_minutes:.2f} minutes.")
+
+    # cache trained model
+    if not skip_cache:
+        torch.save(gpt.state_dict(), TRAINED_MODEL_CACHE)
+     
     return gpt
 
 def classify_text(
@@ -178,11 +196,11 @@ def classify_text(
     input_ids = tokenizer.encode(text)
     supported_context_length = model.pos_emb.weight.shape[0]
 
-    input_ids = input_ids[:min(
-        max_length, supported_context_length
-    )]
-
-    input_ids += [pad_token_id] * (max_length - len(input_ids))
+    if max_length:
+        input_ids = input_ids[:min(
+            max_length, supported_context_length
+        )]
+        input_ids += [pad_token_id] * (max_length - len(input_ids))
 
     input_tensor = torch.tensor(
         input_ids, device=device
