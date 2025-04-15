@@ -2,8 +2,10 @@ from trained_model import get_small_gpt_2_model
 import torch
 from configs import GPT_SMALL
 import tiktoken
+from torch.utils.data import DataLoader 
 import time
-from fine_tuning.classification.loaders import SpamDatasetLoader
+from fine_tuning.classification.dataset import SpamDataset
+from fine_tuning.classification.fetcher import SMSSpamFetcher
 
 def calc_loss_batch(input_batch, target_batch, model, device):
     input_batch = input_batch.to(device)
@@ -57,8 +59,8 @@ def calc_loss_loader(data_loader, model, device, num_batches=None):
 def evaluate_model(model, train_loader, val_loader, device, eval_iter):
     model.eval()
     with torch.no_grad():
-        train_loss = calc_loss_loader()
-        val_loss = calc_loss_loader()
+        train_loss = calc_loss_loader(train_loader, model, device, num_batches=eval_iter)
+        val_loss = calc_loss_loader(val_loader, model, device, num_batches=eval_iter)
     model.train()
     return train_loss, val_loss
 
@@ -105,6 +107,11 @@ def train_classifier_simple(
     return train_losses, val_losses, train_accs, val_accs, examples_seen
 
 def train_spam_classifier():
+    # get data
+    fetcher = SMSSpamFetcher()
+    fetcher.fetch_and_process()
+
+    # init model
     gpt = get_small_gpt_2_model()
     
     # tweak output layer 
@@ -128,17 +135,31 @@ def train_spam_classifier():
     num_epochs = 5
     device = torch.device("cpu")
 
-    train_loader = SpamDatasetLoader(
-        csv_file='../train.csv',
+    train_dataset = SpamDataset(
+        csv_file='train.csv',
         max_length=None,
         tokenizer=tokenizer
     )
-    val_loader = SpamDatasetLoader(
-        csv_file='../validation.csv',
+    val_dataset = SpamDataset(
+        csv_file='validation.csv',
         max_length=None,
         tokenizer=tokenizer
     )
 
+    train_loader = DataLoader(
+        dataset=train_dataset,
+        batch_size=8,
+        shuffle=True,
+        num_workers=0,
+        drop_last=True
+    )
+    val_loader = DataLoader(
+        dataset=val_dataset,
+        batch_size=8,
+        num_workers=0,
+        drop_last=False
+    )
+    
     train_losses, val_losses, train_accs, val_accs, examples_seen = train_classifier_simple(
         gpt, train_loader, val_loader, optimizer, device,
         num_epochs=num_epochs, eval_freq=50,
@@ -149,3 +170,27 @@ def train_spam_classifier():
     execution_time_minutes = (end_time - start_time) / 60
     print(f"Training completed: {execution_time_minutes:.2f} minutes.")
     return gpt
+
+def classify_text(
+    text, model, tokenizer, device, max_length=None, pad_token_id=50256
+):
+    model.eval()
+    input_ids = tokenizer.encode(text)
+    supported_context_length = model.pos_emb.weight.shape[0]
+
+    input_ids = input_ids[:min(
+        max_length, supported_context_length
+    )]
+
+    input_ids += [pad_token_id] * (max_length - len(input_ids))
+
+    input_tensor = torch.tensor(
+        input_ids, device=device
+    ).unsqueeze(0)
+
+    with torch.no_grad():
+        logits = model(input_tensor)[:, -1, :]
+    
+    predicted_label = torch.argmax(logits, dim=-1).item()
+
+    return "spam" if predicted_label == 1 else "not spam"
