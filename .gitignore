@@ -3,6 +3,7 @@
 *.csv
 *.zip
 sms_spam_collection
+*.pdf
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
