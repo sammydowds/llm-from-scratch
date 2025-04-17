@@ -4,6 +4,7 @@
 *.zip
 sms_spam_collection
 *.pdf
+*.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
